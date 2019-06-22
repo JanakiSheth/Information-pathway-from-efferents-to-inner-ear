@@ -1,0 +1,123 @@
+clear variables;
+close all;
+
+%% Parameters
+f = 0.25;
+gca = 4.14*10^(-9);       %Ca conductance when all channels are open
+Eca = 100*10^-3;        %nerst potential for Ca
+alpha0 = 22800;         %opening rate constant
+V0 = 70*10^-3;
+VA = 8.01*10^-3;
+KA = 510;
+beta0 = 0.97;
+VB = 6.17*10^-3;
+KB = 940;
+
+gkca_bar = 16.8*10^-9;  %Conductance of K channels that open in the presence of Ca
+Ek = -80*10^-3;
+K10 = 6*10^-6;          %Ca dissociation constant of 1st transition in Ca activate K channels
+D1 = 0.2;
+k_neg1 = 300;
+K20 = 45*10^-6;         %Ca dissociation constant of 2nd transition in Ca activate K channels
+D2 = 0;
+k_neg2 = 5000;
+K30 = 20*10^-6;         %Ca dissociation constant of 3rd transition in Ca activate K channels
+D3 = 0.2;
+k_neg3 = 1500;
+alphaC0 = 450;
+Va = 33*10^-3;
+betaC = 1000;
+
+U = 0.02;
+epsi = 3.4*10^-5;
+F = 96490;				% C.mol-1; Faraday constant
+z = 2;                  %Ca valence
+R = 8.314;
+T = 295;
+Cvol = (1.25*10^(-12))/22.4; %Volume of cell, 22.4 is conversion of volume to moles
+Ks = 2800;
+
+EL = 0;             %reversal potential of leakage current from catacuzzeno 2003b
+gL = 0.1*10^-9;     %conductance of leakage current from catacuzzeno 2003b
+Cm = 10*10^-12;     %hair cell capacitance from neiman 2011
+
+duration = 5;
+h = 10^-6;
+steps = round(duration/h);
+
+%% variables
+
+Ica = zeros(steps,1);
+Vm = zeros(steps,1)*(-70*10^-3);
+alpha_ca = zeros(steps,1);
+beta_ca = zeros(steps,1);
+tauca = zeros(steps,1);
+mca = zeros(steps,1); 
+mca_infi = zeros(steps,1); 
+Ca = zeros(steps,1); 
+K1 = zeros(steps,1); 
+K2 = zeros(steps,1); 
+K3 = zeros(steps,1); 
+alphaC = zeros(steps,1);
+C0 = zeros(steps,1);
+C1 = zeros(steps,1);
+C2 = zeros(steps,1);
+O2 = zeros(steps,1);
+O3 = zeros(steps,1);
+gkca = zeros(steps,1);
+Ikca = zeros(steps,1);
+Icom = zeros(steps,1);
+
+alpha_ca(1) = alpha0*exp(-(Vm(1) + V0)/VA) + KA;
+beta_ca(1) = beta0*exp((Vm(1) + V0)/VB) + KB;
+mca_infi(1) = beta_ca(1)/(alpha_ca(1) + beta_ca(1));
+tauca(1) = 1/(alpha_ca(1) + beta_ca(1));
+K1(1) = K10*exp(-D1*z*F*Vm(1)/(R*T)); 
+K2(1) = K20*exp(-D2*z*F*Vm(1)/(R*T)); 
+K3(1) = K30*exp(-D3*z*F*Vm(1)/(R*T));
+Ca(1) = 10^-9;
+C0(1) = 10^-9; C1(1) = 10^-9; C2(1) = 10^-9; O2(1) = 10^-9; O3(1) = 10^-9;
+
+%% code from hudspeth Lewis 1988
+
+for i = 0/h+1:duration/h
+    
+    if duration/(4*h) < i && i < duration/(2*h) 
+        Icom(i) = 10*10^-12;
+    else
+        Icom(i) = 0*10^-3;
+    end
+    
+    alpha_ca(i+1) = alpha0*exp(-(Vm(i) + V0)/VA) + KA;
+    beta_ca(i+1) = beta0*exp((Vm(i) + V0)/VB) + KB;
+    mca_infi(i+1) = beta_ca(i)/(alpha_ca(i) + beta_ca(i));
+    tauca(i+1) = 1/(alpha_ca(i) + beta_ca(i));
+    mca(i+1) = mca(i) + h*(mca_infi(i) - mca(i))/tauca(i); %m0 = 0 below -60mV
+    Ica(i+1) = gca*(mca(i)^3)*(Vm(i) - Eca);
+    
+    Ca(i+1) = Ca(i) + h*(-U*Ica(i)/(z*F*Cvol*epsi) - Ks*Ca(i));
+    K1(i+1) = K10*exp(-D1*z*F*Vm(i)/(R*T));
+    K2(i+1) = K20*exp(-D2*z*F*Vm(i)/(R*T));
+    K3(i+1) = K10*exp(-D3*z*F*Vm(i)/(R*T));
+    alphaC(i+1) = alphaC0*exp(Vm(i)/Va);
+    
+    %Ca(i+1) = Ca(i) + h*(-0.00061*Ica(i) - Ks*Ca(i));   %from neiman 2011
+    C1(i+1) = C1(i) + h*(k_neg1*Ca(i)*C0(i)/K1(i) + k_neg2*C2(i) - (k_neg1 + k_neg2*Ca(i)/K2(i))*C1(i));
+    C2(i+1) = C2(i) + h*(k_neg2*Ca(i)*C1(i)/K2(i) + alphaC(i)*O2(i) - (k_neg2 + betaC)*C2(i));
+    O2(i+1) = O2(i) + h*(betaC*C2(i) + k_neg3*O3(i) - (alphaC(i) + k_neg3*Ca(i)/K3(i))*O2(i));
+    O3(i+1) = O3(i) + h*(k_neg3*Ca(i)*O2(i)/K3(i) - k_neg3*O3(i));
+    C0(i+1) = 1 - (C1(i) + C2(i) + O2(i) + O3(i));
+    
+    gkca(i+1) = gkca_bar*(O2(i) + O3(i));
+    Ikca(i+1) = gkca(i)*(Vm(i) - Ek);
+    
+    Vm(i+1) = Vm(i) + h*(- gL*(Vm(i) - EL) - Ikca(i) - Ica(i)  + Icom(i))/Cm;    
+end
+
+%% figures
+figure;
+plot(Ica(floor(duration/(5*h)) : floor(duration*3/(4*h))));
+figure;
+plot(Ikca(floor(duration/(5*h)) : floor(duration*3/(4*h))));
+figure;
+plot(Vm(floor(duration/(5*h)) : floor(duration*3/(4*h))));
