@@ -2,9 +2,66 @@ clear variables;
 close all;
 
 %% Parameters
-f = 0.25;
-gca = 4.14*10^(-9);       %Ca conductance when all channels are open
-Eca = 100*10^-3;        %nerst potential for Ca
+
+%all values from catacuzzeno 2003b 
+Pdrk = 2.4*10^(-13);    
+Kin = 112*10^-3;            %intracellular K conc.
+Kex = 2*10^-3;              %extracellular K conc.
+Vdrkhalf = -48.3*10^(-3);
+kdrk = 4.19*10^(-3);
+P1drk = 0.0032;
+P2drk = -20.9*10^(-3);
+P3drk = 0.003;
+P4drk = 1.467;
+P5drk = 5.96*10^(-3);
+P6drk = 0.009;
+
+%all values from catacuzzeno 2003b 
+Pa = 1.65*10^(-13);
+Vahalf = -61*10^(-3);
+ka = 10.7*10^(-3);
+Vh1half = -83*10^(-3);
+kh1 = 3.9*10^(-3);
+C1h1 = 0.074;
+C2h1 = 0.321;
+C3h1 = -0.082;
+C4h1 = 0.0155;
+Cah1 = 0.54;
+tauh2 = 0.3;
+Va1half = -0.0215;
+ka1 = 0.0156;
+
+%all values from catacuzzeno 2003b 
+gk1 = 42*10^(-9);   
+Ek1 = -0.102;       
+Vk1half = -0.102;   
+sk1 = 0.00696;      
+Pk1max = 1;         
+Pk1min = 0.01;      
+tauk10 = 0.00042;   
+
+gh = 1.5*10^-9;     %catacuzzeno 2004
+Eh = -0.040;        %catacuzzeno 2003b
+Vhhalf = -0.090;    %catacuzzeno 2003b
+sh = 0.00960;       %catacuzzeno 2003b
+Phmax = 1;          %catacuzzeno 2003b
+Phmin = 0.18;       %catacuzzeno 2003b
+tauh0 = 0.1395;     %catacuzzeno 2003b
+Kth = 0.080;        %catacuzzeno 2003b
+
+gca = 1.1*10^-9;    %neiman 2011
+Eca = 42.5*10^-3;   %catacuzzeno 2003b
+Vcahalf = -55*10^-3;    %catacuzzeno 2003b
+kca = 12.2*10^-3;   %catacuzzeno 2003b
+P1ca = 0.046*10^-3; %catacuzzeno 2003b
+P2ca = 0.325*10^-3; %catacuzzeno 2003b
+P3ca = -77*10^-3;   %catacuzzeno 2003b
+P4ca = 51.67*10^-3; %catacuzzeno 2003b
+
+%values fron Hudspeth 1987
+f = 0.25;               %fraction of Ca conductance available
+%gca = 4.14*10^(-9);       %Ca conductance when all channels are open
+%Eca = 100*10^-3;        %nerst potential for Ca
 alpha0 = 22800;         %opening rate constant
 V0 = 70*10^-3;
 VA = 8.01*10^-3;
@@ -13,6 +70,7 @@ beta0 = 0.97;
 VB = 6.17*10^-3;
 KB = 940;
 
+%values fron Hudspeth 1987
 gkca_bar = 16.8*10^-9;  %Conductance of K channels that open in the presence of Ca
 Ek = -80*10^-3;
 K10 = 6*10^-6;          %Ca dissociation constant of 1st transition in Ca activate K channels
@@ -28,6 +86,7 @@ alphaC0 = 450;
 Va = 33*10^-3;
 betaC = 1000;
 
+%values fron Hudspeth 1987
 U = 0.02;
 epsi = 3.4*10^-5;
 F = 96490;				% C.mol-1; Faraday constant
@@ -39,14 +98,38 @@ Ks = 2800;
 
 EL = 0;             %reversal potential of leakage current from catacuzzeno 2003b
 gL = 0.1*10^-9;     %conductance of leakage current from catacuzzeno 2003b
-Cm = 10*10^-12;     %hair cell capacitance from neiman 2011
+Cm = 20*10^-12;     %hair cell capacitance from neiman 2011
 
-duration = 5;
-h = 10^-6;
+duration = 10;
+h = 1*10^(-6);
 steps = round(duration/h);
 
 %% variables
 
+Idrk = zeros(steps,1);
+mdrk = zeros(steps,1);
+mdrk_infi = zeros(steps,1);
+taudrk = zeros(steps,1);
+alpha_drk = zeros(steps,1);
+beta_drk = zeros(steps,1);
+Ia = zeros(steps,1);
+ma =  zeros(steps,1);
+ma_infi = zeros(steps,1);
+taua = zeros(steps,1);
+h1 = zeros(steps,1);
+h1_infi = zeros(steps,1);
+tauh1 = zeros(steps,1);
+h2 = zeros(steps,1);
+h2_infi = zeros(steps,1);
+a1 = zeros(steps,1);
+Ik1 = zeros(steps,1);
+tauk1 = zeros(steps,1);
+mk1 = zeros(steps,1);
+mk1_infi = zeros(steps,1);
+Ih = zeros(steps,1);
+tauh = zeros(steps,1);
+mh = zeros(steps,1);
+mh_infi = zeros(steps,1);
 Ica = zeros(steps,1);
 Vm = zeros(steps,1)*(-70*10^-3);
 alpha_ca = zeros(steps,1);
@@ -68,26 +151,93 @@ gkca = zeros(steps,1);
 Ikca = zeros(steps,1);
 Icom = zeros(steps,1);
 
-alpha_ca(1) = alpha0*exp(-(Vm(1) + V0)/VA) + KA;
-beta_ca(1) = beta0*exp((Vm(1) + V0)/VB) + KB;
-mca_infi(1) = beta_ca(1)/(alpha_ca(1) + beta_ca(1));
-tauca(1) = 1/(alpha_ca(1) + beta_ca(1));
+
+%% Initialization
+Vm(1) = -0.070;
+alpha_drk(1) = 1/(P1drk*exp(Vm(1)/P2drk) + P3drk);
+beta_drk(1) = 1/(P4drk*exp(Vm(1)/P5drk) + P6drk);
+taudrk(1) = 1/(alpha_drk(1) + beta_drk(1));
+tauh(1) = tauh0*exp(-(Vm(1) + 0.063)/0.062) + Kth;
+tauca(1) = P1ca + P2ca*exp(-((Vm(1) - P3ca)/P4ca)^2);
+V0k1 = -0.070; Vtk1 = -0.007; Ktk1 = 0.00024; tauk1(1) = tauk10*exp((Vm(1) - V0k1)/Vtk1) + Ktk1;
+ma_infi(1) = 1/(1 + exp(-(Vm(1) - Vahalf)/ka));
+h1_infi(1) = 1/(1 + exp((Vm(1) - Vh1half)/kh1));
+tauh1(1) = C1h1 + C2h1*exp(-((Vm(1) - C3h1)/C4h1)^2);
+taua(1) = 0.173*exp(Vm(1)/0.0179) + 0.0054;
+
+%alpha_ca(1) = alpha0*exp(-(Vm(1) + V0)/VA) + KA;
+%beta_ca(1) = beta0*exp((Vm(1) + V0)/VB) + KB;
+%mca_infi(1) = beta_ca(1)/(alpha_ca(1) + beta_ca(1));
+%tauca(1) = 1/(alpha_ca(1) + beta_ca(1));
 K1(1) = K10*exp(-D1*z*F*Vm(1)/(R*T)); 
 K2(1) = K20*exp(-D2*z*F*Vm(1)/(R*T)); 
 K3(1) = K30*exp(-D3*z*F*Vm(1)/(R*T));
 Ca(1) = 10^-9;
 C0(1) = 10^-9; C1(1) = 10^-9; C2(1) = 10^-9; O2(1) = 10^-9; O3(1) = 10^-9;
 
-%% code from hudspeth Lewis 1988
+%% code from hudspeth Lewis 1988 and catacuzzeno 2003b (More currents added, and Ica values have changed)
 
 for i = 0/h+1:duration/h
     
     if duration/(4*h) < i && i < duration/(2*h) 
-        Icom(i) = 10*10^-12;
+        Icom(i) = 100*10^-12;
     else
         Icom(i) = 0*10^-3;
     end
     
+    Idrk(i+1) = Pdrk*Vm(i)*F^2*mdrk(i)^2*(Kin - Kex*exp(-F*Vm(i)/(R*T)))/((1 - exp(-F*Vm(i)/(R*T)))*R*T);
+    mdrk(i+1) = mdrk(i) + h*(mdrk_infi(i) - mdrk(i))/taudrk(i);
+    mdrk_infi(i+1) = 1/sqrt(1 + exp(-(Vm(i) - Vdrkhalf)/kdrk));
+    taudrk(i+1) = 1/(alpha_drk(i) + beta_drk(i));
+    alpha_drk(i+1) = 1/(P1drk*exp(Vm(i)/P2drk) + P3drk);
+    beta_drk(i+1) = 1/(P4drk*exp(Vm(i)/P5drk) + P6drk);
+    
+    if Vm(i) < -0.055
+        a = 0.173; b = 0.0179; c = 0.0054;
+    else
+        a = 0.048; b = -0.0231; c = 0.00114;
+    end
+    
+    Ia(i+1) = ma(i)^3*(a1(i)*h1(i) + (1-a1(i))*h2(i))*Pa*F^2*Vm(i)*(Kin - Kex*exp(-F*Vm(i)/(R*T)))/((1 - exp(-F*Vm(i)/(R*T)))*R*T);
+    ma(i+1) = ma(i) + h*(ma_infi(i) - ma(i))/taua(i);
+    ma_infi(i+1) = 1/(1 + exp(-(Vm(i) - Vahalf)/ka));
+    taua(i+1) = a*exp(Vm(i)/b) + c;
+    h1(i+1) = h1(i) + h*(h1_infi(i) - h1(i))/tauh1(i);
+    h1_infi(i+1) = 1/(1 + exp((Vm(i) - Vh1half)/kh1));
+    tauh1(i+1) = C1h1 + C2h1*exp(-((Vm(i) - C3h1)/C4h1)^2);
+    h2(i+1) = h2(i) + h*(h2_infi(i) - h2(i))/tauh2;
+    h2_infi(i+1) = h1_infi(i+1);
+    a1(i+1) = (1 - Cah1)/(1 + exp((Vm(i) - Va1half)/ka1)) + Cah1;
+    
+    if Vm(i) < -0.102
+        V0k1 = -0.145; Vtk1 = 0.024; Ktk1 = 0;
+    else
+        V0k1 = -0.070; Vtk1 = -0.007; Ktk1 = 0.00024;
+    end
+    
+    Ik1(i+1) = gk1*(Vm(i) - Ek1)*mk1(i);
+    mk1(i+1) = mk1(i) + h*(mk1_infi(i) - mk1(i))/tauk1(i);
+    mk1_infi(i+1) = (Pk1max - Pk1min)/(1 + exp((Vm(i) - Vk1half)/sk1)) + Pk1min;
+    tauk1(i+1) = tauk10*exp((Vm(i) - V0k1)/Vtk1) + Ktk1;
+    
+    if Vm(i) < -0.090
+        V0h = -0.123; Vth = 0.062;
+    else
+        V0h = -0.063; Vth = -0.062;
+    end
+    
+    Ih(i+1) = gh*(Vm(i) - Eh)*(3*mh(i)^2*(1 - mh(i)) + mh(i)^3);
+    mh(i+1) = mh(i) + h*(mh_infi(i) - mh(i))/tauh(i);
+    mh_infi(i+1) = (Phmax - Phmin)/(1 + exp((Vm(i) - Vhhalf)/sh)) + Phmin;
+    tauh(i+1) = tauh0*exp((Vm(i) - V0h)/Vth) + Kth;
+    
+    mca_infi(i+1) = 1/(1 + exp(-(Vm(i) - Vcahalf)/kca));
+    tauca(i+1) = P1ca + P2ca*exp(-((Vm(i) - P3ca)/P4ca)^2);
+    mca(i+1) = mca(i) + h*(mca_infi(i) - mca(i))/tauca(i);
+    Ica(i+1) = gca*mca(i)^3*(Vm(i) - Eca);
+    
+    %{
+    % From here on is from Hudspeth's paper.
     alpha_ca(i+1) = alpha0*exp(-(Vm(i) + V0)/VA) + KA;
     beta_ca(i+1) = beta0*exp((Vm(i) + V0)/VB) + KB;
     mca_infi(i+1) = beta_ca(i)/(alpha_ca(i) + beta_ca(i));
@@ -110,14 +260,14 @@ for i = 0/h+1:duration/h
     
     gkca(i+1) = gkca_bar*(O2(i) + O3(i));
     Ikca(i+1) = gkca(i)*(Vm(i) - Ek);
-    
-    Vm(i+1) = Vm(i) + h*(- gL*(Vm(i) - EL) - Ikca(i) - Ica(i)  + Icom(i))/Cm;    
+    %}
+    Vm(i+1) = Vm(i) + h*(- gL*(Vm(i) - EL) - Ik1(i) - Ica(i) - Idrk(i) - Ia(i) - Ih(i) + Icom(i))/Cm;    
 end
 
 %% figures
 figure;
-plot(Ica(floor(duration/(5*h)) : floor(duration*3/(4*h))));
+plot(h:h:duration+h, Idrk);
 figure;
-plot(Ikca(floor(duration/(5*h)) : floor(duration*3/(4*h))));
+plot(h:h:duration+h, Ia);
 figure;
-plot(Vm(floor(duration/(5*h)) : floor(duration*3/(4*h))));
+plot(h:h:duration+h, Vm);
